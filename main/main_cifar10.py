@@ -262,12 +262,6 @@ print("Saved CSV:", os.path.abspath(args.csv))
 
 '''
 %cd /content/fedstas
-
-# Non-DP, β = 0.01 (FedSTS + FedSTaS no-DP)
-!python data_cifar10.py --beta 0.01 --rounds 100 --model fast_cnn --clients 100 --h 10 --m_per_round 10 --n_star 2500 --M 300
-
-# With DP (ε = 3), β = 0.01 (adds FedSTaS DP curve)
-!python data_cifar10.py --beta 0.01 --epsilon 3 --rounds 100 --model fast_cnn --clients 100 --h 10 --m_per_round 10 --n_star 2500 --M 300
 !python main/main_cifar10.py --beta 0.01 --epsilon 3 --rounds 100 --model fast_cnn --clients 100 --h 10 --clients_per_round 10 --n_star 2500 --M 300
 !python main/main_cifar10.py --iid --epsilon 3 --rounds 100 --model fast_cnn --clients 100 --h 10 --clients_per_round 10 --n_star 2500 --M 300
 '''

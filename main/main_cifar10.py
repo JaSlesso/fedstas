@@ -10,11 +10,11 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 
 # --- repo model import  ---
-try:
-    from model.cifar10 import create_model
-except ImportError:
-    sys.path.append(os.getcwd())
-    from main.main_cifar10 import create_model 
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from model.cifar10 import create_model
 
 from server.coordinator import FedSTaSCoordinator
 

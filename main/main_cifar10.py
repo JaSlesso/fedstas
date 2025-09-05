@@ -10,9 +10,18 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 
 # --- repo model import  ---
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+
+
+# Get the absolute path to the repository root
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+print("Repository root:", repo_root)
+print("Contents of repo root:", os.listdir(repo_root))
+
+# Add the repository root to Python path
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+print("Python path:", sys.path[:3])  # Show first 3 entries
 
 from model.cifar10 import create_model
 

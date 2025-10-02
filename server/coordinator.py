@@ -12,7 +12,8 @@ from server.stratification import (
 from server.privacy import estimate_total_sample_size
 from server.aggregation import aggregate_models
 from utils.evals import evaluate_model
-
+import torch.nn as nn ###
+from torch.utils.data import DataLoader, Subset
 class FedSTaSCoordinator:
     def __init__(
             self,
@@ -38,11 +39,20 @@ class FedSTaSCoordinator:
         self.cached_S_h = None
         self.cached_N_h = None
         self.cached_m_h = None
+        ####added proxy_frac
+        self.proxy_frac = float(self.config.get("proxy_frac", 0.10))      
+        self.proxy_cap  = int(self.config.get("proxy_cap", 128))          
+        self.stratify_device = str(self.config.get("stratify_device", "cpu"))  
+        # project proxy vectors to  d_prime 
+        self.proj_dim = int(self.config.get("proj_dim", self.config.get("d_prime", 5)))
+
+        # cache: standardized proxy matrix for all clients (used for norms, etc.)
+        self.cached_G = None  # shape [N, d']
 
     def run(self, num_rounds: int):
         for round_idx in range(num_rounds):
             print(f"\n=== Round {round_idx + 1} ===")
-
+            '''
             # === Step 1–3: Optional Re-stratification ===
             if round_idx == 0 or round_idx % self.restratify_every == 0:
                 if self.verbose:
@@ -73,6 +83,53 @@ class FedSTaSCoordinator:
             else:
                 if self.verbose:
                     print("\n[Stratification] (Using cached strata and allocations)")
+            '''
+
+            # === Step 1–3: Optional Re-stratification ===
+            if round_idx == 0 or round_idx % self.restratify_every == 0:
+                if self.verbose:
+                    print("\n[Stratification] (Recomputing proxy grads + MiniBatchKMeans)")
+
+                # Build proxy gradients for ALL clients (cheap: one tiny batch each, on CPU)
+                all_client_indices = list(range(self.num_clients))
+                G_all = build_client_proxies(
+                    selected_clients=all_client_indices,
+                    global_model=self.global_model,
+                    client_datasets=self.client_datasets,
+                    device=self.stratify_device,       # "cpu" recommended on Colab
+                    frac=self.proxy_frac,              # ~10% of local data
+                    cap=self.proxy_cap,                # but capped at 128 examples
+                    last_layer_only=True,              # tiny, stable proxy (final layer grad)
+                    proj_dim=self.proj_dim,            # d' (matches your d_prime)
+                    proj_seed=0,
+                    autocast_dtype=None                # set torch.float16 if you move this to GPU
+                )   # shape [N, d']
+
+                # Standardize (z-score) so clustering isn’t scale-dominated
+                mu = G_all.mean(axis=0)
+                sigma = G_all.std(axis=0) + 1e-8
+                G_std = (G_all - mu) / sigma
+                self.cached_G = G_std                  # keep for Step 4 norms
+
+                # Cluster ALL clients into H strata with MiniBatchKMeans (fast CPU)
+                strata_local = stratify_clients_mbkm(
+                    G_std, H=self.config["H"], batch_size=256, max_iter=50, seed=42
+                )
+                # map local indices (0..N-1) back to global client ids
+                self.cached_strata = {h: [all_client_indices[i] for i in idxs]
+                                      for h, idxs in strata_local.items()}
+
+                # Variability per stratum (for Neyman allocation)
+                self.cached_S_h = compute_stratum_variability(G_std, self.cached_strata)
+                self.cached_N_h = {h: len(c) for h, c in self.cached_strata.items()}
+                self.cached_m_h = neyman_allocation(
+                    self.cached_N_h, self.cached_S_h, self.config["clients_per_round"]
+                )
+            else:
+                if self.verbose:
+                    print("\n[Stratification] (Using cached strata and allocations)")
+            
+
             
             # Assign from cache
             strata = self.cached_strata
@@ -92,7 +149,8 @@ class FedSTaSCoordinator:
             for h, client_indices in strata.items():
                 if not client_indices or m_h[h] == 0:
                     continue
-                norms = [np.linalg.norm(reconstructed[k]) for k in client_indices]
+                #norms = [np.linalg.norm(reconstructed[k]) for k in client_indices]
+                norms = [np.linalg.norm(self.cached_G[k]) for k in client_indices]
                 selected = importance_sample(client_indices, norms, m_h[h])
                 selected_clients_by_stratum[h] = selected
                 if self.verbose:

@@ -158,10 +158,10 @@ class FedSTaSCoordinator:
             N_h = self.cached_N_h
             m_h = self.cached_m_h
             
-            if self.verbose:
-                print("\n[Stratification]")
-                for h, clients in strata.items():
-                    print(f"  Stratum {h}: N_h = {len(clients)}, S_h = {S_h[h]:.4f}, m_h = {m_h[h]}")
+            #if self.verbose:
+                #print("\n[Stratification]")
+                #for h, clients in strata.items():
+                    #print(f"  Stratum {h}: N_h = {len(clients)}, S_h = {S_h[h]:.4f}, m_h = {m_h[h]}")
 
             # Step 4: Sample clients via importance sampling
             selected_clients_by_stratum = {}
@@ -174,8 +174,8 @@ class FedSTaSCoordinator:
                 norms = [np.linalg.norm(self.cached_G[k]) for k in client_indices]
                 selected = importance_sample(client_indices, norms, m_h[h])
                 selected_clients_by_stratum[h] = selected
-                if self.verbose:
-                    print(f"  Stratum {h}: selected {selected}")
+                #if self.verbose:
+                    #print(f"  Stratum {h}: selected {selected}")
             '''
             # Step 5: Collect privatized sample counts
             responses = []

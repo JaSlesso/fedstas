@@ -70,7 +70,7 @@ class FedSTaSCoordinator:
         # cache: standardized proxy matrix for all clients (used for norms, etc.)
         self.cached_G = None  # shape [N, d']
          # FedAvg-style weighted aggregation (default: True for proper FedAvg)
-        self.use_weighted_aggregation = bool(self.config.get("use_weighted_aggregation", True))
+        self.use_weighted_aggregation = bool(self.config.get("use_weighted_aggregation", False))
 
 
     def run(self, num_rounds: int):

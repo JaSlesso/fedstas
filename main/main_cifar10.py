@@ -7,10 +7,15 @@ import torch
 from torchvision import datasets, transforms
 from torch.utils.data import Subset
 from collections import defaultdict
-import matplotlib.pyplot as plt
 
 # --- repo model import  ---
+import sys
+import os
 
+# Debug: Print current working directory and file location
+print("Current working directory:", os.getcwd())
+print("Script location:", __file__)
+print("Script directory:", os.path.dirname(__file__))
 
 # Get the absolute path to the repository root
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -23,8 +28,8 @@ if repo_root not in sys.path:
 
 print("Python path:", sys.path[:3])  # Show first 3 entries
 
+# Now import the modules
 from model.cifar10 import create_model
-
 from server.coordinator import FedSTaSCoordinator
 
 
@@ -44,9 +49,17 @@ parser.add_argument("--batch_size", type=int, default=64, help="Local batch size
 parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
 parser.add_argument("--weight_decay", type=float, default=1e-5, help="Weight decay")
 parser.add_argument("--seed", type=int, default=562, help="RNG seed")
-parser.add_argument("--verbose", action="store_true", help="More logs")
+parser.add_argument("--verbose",default=True, action="store_true", help="More logs")
 parser.add_argument("--csv", type=str, default="cifar10_beta_eps_results.csv", help="Output CSV filename")
 parser.add_argument("--iid", action="store_true", help="Use IID data distribution instead of Dirichlet")
+parser.add_argument("--method", type=str, default="all", choices=["all", "fedsts", "fedstas_no_dp", "fedstas_dp"], 
+                    help="Which method to run: all (default), fedsts, fedstas_no_dp, or fedstas_dp")
+parser.add_argument("--clustering", type=str, default="gpu", choices=["minibatch", "gpu"],
+                    help="Clustering method: minibatch (CPU, default) or gpu (cuML)")
+parser.add_argument("--proxy_frac", type=float, default=0.30, help="Fraction of client data for proxy gradient (default: 0.30 = 30%%)")
+parser.add_argument("--proxy_cap", type=int, default=128, help="Max samples for proxy gradient computation (default: 128)")
+parser.add_argument("--d_prime", type=int, default=5, help="Projection dimension for stratification (default: 5)")
+parser.add_argument("--restratify_every", type=int, default=20, help="Re-stratify every N rounds (default: 20)")
 args = parser.parse_args()
 
 # ----------------------------
@@ -134,8 +147,8 @@ def alpha_from_eps(eps, M):
 
 BASE_CFG = dict(
     H=args.h,
-    d_prime=5,
-    restratify_every=10,
+    d_prime=args.d_prime,
+    restratify_every=args.restratify_every,
     clients_per_round=args.clients_per_round,
     M=args.M,
     n_star=args.n_star,          
@@ -144,6 +157,9 @@ BASE_CFG = dict(
     lr=args.lr,
     weight_decay=args.weight_decay,
     verbose=args.verbose,
+    clustering_method=args.clustering,  # "minibatch" or "gpu"
+    proxy_frac=args.proxy_frac,
+    proxy_cap=args.proxy_cap,
 )
 
 def make_coordinator(cfg_overrides=None):
@@ -166,24 +182,33 @@ def make_coordinator(cfg_overrides=None):
         verbose=cfg.get("verbose", False),
     )
 
-def run_once(label, cfg_overrides=None, num_rounds=100):
+def run_once(label, cfg_overrides=None, num_rounds=args.rounds):
     print(f"\n=== Running: {label} ===")
     coord = make_coordinator(cfg_overrides)
     coord.run(num_rounds=num_rounds)
     return np.array(coord.validation_curve, dtype=float), np.array(coord.validation_loss_curve, dtype=float)
 
 # ----------------------------
-# 4) Define the 3 runs
+# 4) Define the runs based on --method argument
 # ----------------------------
-runs = [
-    ("FedSTS",          dict(n_star=None,               epsilon=None)),          
-    ("FedSTaS (no-DP)", dict(n_star=BASE_CFG["n_star"], epsilon=None)),           
-    (f"FedSTaS (ε={args.epsilon})", dict(n_star=BASE_CFG["n_star"], epsilon=args.epsilon)),  
-]
+all_runs = {
+    "fedsts": ("FedSTS", dict(n_star=None, epsilon=None)),
+    "fedstas_no_dp": ("FedSTaS (no-DP)", dict(n_star=BASE_CFG["n_star"], epsilon=None)),
+    "fedstas_dp": (f"FedSTaS (ε={args.epsilon})", dict(n_star=BASE_CFG["n_star"], epsilon=args.epsilon)),
+}
 
-# If epsilon is not provided, skip the DP run to avoid confusion
-if args.epsilon is None:
-    runs = runs[:2]
+# Select which method(s) to run
+if args.method == "all":
+    # Run all available methods
+    runs = [all_runs["fedsts"], all_runs["fedstas_no_dp"]]
+    if args.epsilon is not None:
+        runs.append(all_runs["fedstas_dp"])
+else:
+    # Run only the specified method
+    if args.method == "fedstas_dp" and args.epsilon is None:
+        print("ERROR: --epsilon must be provided when running fedstas_dp method")
+        sys.exit(1)
+    runs = [all_runs[args.method]]
 
 # ----------------------------
 # 5) Execute & collect
@@ -196,81 +221,91 @@ for label, over in runs:
     results_loss[label] = loss_curve
 
 # ----------------------------
-# 6) Plot two separate figures 
-# ----------------------------
-# Set Statistical Sinica style
-plt.style.use('default')  # Start with default
-plt.rcParams.update({
-    'font.family': 'serif',
-    'font.serif': ['Times New Roman', 'Times', 'DejaVu Serif'],
-    'font.size': 12,
-    'axes.labelsize': 12,
-    'axes.titlesize': 14,
-    'xtick.labelsize': 10,
-    'ytick.labelsize': 10,
-    'legend.fontsize': 10,
-    'figure.titlesize': 16,
-    'lines.linewidth': 2,
-    'axes.linewidth': 1,
-    'grid.linewidth': 0.5,
-    'grid.alpha': 0.7
-})
-
-# Define colors for the three methods
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Blue, Orange, Green
-linestyles = ['-', '--', '-.']
-markers = ['o', 's', '^']
-
-# Plot 1: Validation Accuracy
-plt.figure(figsize=(10, 6))
-for i, (label, curve) in enumerate(results_acc.items()):
-    plt.plot(range(1, len(curve)+1), curve, 
-             color=colors[i], linestyle=linestyles[i], marker=markers[i],
-             label=label, linewidth=2, markersize=4, markevery=5)
-
-plt.title('Validation Accuracy', fontsize=16, fontweight='bold')
-plt.xlabel('Round', fontsize=12)
-plt.ylabel('Accuracy', fontsize=12)
-plt.grid(True, alpha=0.7)
-plt.legend(fontsize=11, frameon=True, fancybox=True, shadow=True)
-plt.tight_layout()
-plt.show()
-
-# Plot 2: Validation Loss
-plt.figure(figsize=(10, 6))
-for i, (label, curve) in enumerate(results_loss.items()):
-    plt.plot(range(1, len(curve)+1), curve, 
-             color=colors[i], linestyle=linestyles[i], marker=markers[i],
-             label=label, linewidth=2, markersize=4, markevery=5)
-
-plt.title('Validation Loss', fontsize=16, fontweight='bold')
-plt.xlabel('Round', fontsize=12)
-plt.ylabel('Loss', fontsize=12)
-plt.grid(True, alpha=0.7)
-plt.legend(fontsize=11, frameon=True, fancybox=True, shadow=True)
-plt.tight_layout()
-plt.show()
-
-# ----------------------------
-# 7) Save CSV
+# 6) Save CSV
 # ----------------------------
 import pandas as pd
 rows = []
 for label in results_acc.keys():
     acc_curve = results_acc[label]
     loss_curve = results_loss[label]
+    
+    # Determine method name for CSV
+    if "FedSTS" in label and "FedSTaS" not in label:
+        method_name = "FedSTS"
+        actual_n_star = 0
+        actual_epsilon = None
+    elif "no-DP" in label:
+        method_name = "FedSTaS_no_DP"
+        actual_n_star = args.n_star
+        actual_epsilon = None
+    else:
+        method_name = "FedSTaS_DP"
+        actual_n_star = args.n_star
+        actual_epsilon = args.epsilon
+    
     for r, (acc, loss) in enumerate(zip(acc_curve, loss_curve), start=1):
         rows.append({
-            "method": label, "round": r, "accuracy": float(acc), "loss": float(loss),
-            "beta": args.beta, "epsilon": args.epsilon, "M": args.M,
-            "model": args.model, "clients": args.clients,
-            "H": args.h, "clients_per_round": args.clients_per_round, "n_star": args.n_star
+            "method": method_name,
+            "round": r,
+            "test_accuracy": float(acc),
+            "test_loss": float(loss),
+            "beta": args.beta if not args.iid else None,
+            "data_distribution": "IID" if args.iid else f"Dirichlet(β={args.beta})",
+            "epsilon": actual_epsilon,
+            "M": args.M,
+            "n_star": actual_n_star,
+            "model": args.model,
+            "total_clients": args.clients,
+            "H": args.h,
+            "clients_per_round": args.clients_per_round,
+            "local_epochs": args.epochs,
+            "batch_size": args.batch_size,
+            "lr": args.lr,
+            "weight_decay": args.weight_decay,
+            "seed": args.seed
         })
-pd.DataFrame(rows).to_csv(args.csv, index=False)
-print("Saved CSV:", os.path.abspath(args.csv))
+
+df = pd.DataFrame(rows)
+df.to_csv(args.csv, index=False)
+print(f"\nSaved results to: {os.path.abspath(args.csv)}")
+print(f"Total rows: {len(df)}")
+print(f"Methods: {df['method'].unique().tolist()}")
+print(f"Rounds: {df['round'].min()} to {df['round'].max()}")
 
 '''
 %cd /content/fedstas
+
+# Non-DP, β = 0.01 (FedSTS + FedSTaS no-DP)
+!python data_cifar10.py --beta 0.01 --rounds 100 --model fast_cnn --clients 100 --h 10 --m_per_round 10 --n_star 2500 --M 300
+
+# With DP (ε = 3), β = 0.01 (adds FedSTaS DP curve)
+!python data_cifar10.py --beta 0.01 --epsilon 3 --rounds 100 --model fast_cnn --clients 100 --h 10 --m_per_round 10 --n_star 2500 --M 300
 !python main/main_cifar10.py --beta 0.01 --epsilon 3 --rounds 100 --model fast_cnn --clients 100 --h 10 --clients_per_round 10 --n_star 2500 --M 300
 !python main/main_cifar10.py --iid --epsilon 3 --rounds 100 --model fast_cnn --clients 100 --h 10 --clients_per_round 10 --n_star 2500 --M 300
+
+
+
+
+import os
+os.chdir('/content')
+
+# Clone repository
+!git clone https://github.com/JaSlesso/fedstas.git
+os.chdir('fedstas')
+
+# Install scikit-learn (required for MiniBatch KMeans)
+!pip install -q scikit-learn
+
+# Run with fast stratification (already enabled!)
+!python main/main_cifar10.py \
+    --iid \
+    --epsilon 3 \
+    --rounds 50 \
+    --model fast_cnn \
+    --clients 100 \
+    --h 5 \
+    --clients_per_round 10 \
+    --n_star 2500 \
+    --M 300
+
 '''

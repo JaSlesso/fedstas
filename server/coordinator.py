@@ -13,7 +13,8 @@ from server.stratification import (
     neyman_allocation, importance_sample
 )
 from server.privacy import estimate_total_sample_size
-from server.aggregation import aggregate_models
+#from server.aggregation import aggregate_models
+from server.aggregation import aggregate_models, aggregate_models_weighted
 from utils.evals import evaluate_model
 
 
@@ -68,6 +69,8 @@ class FedSTaSCoordinator:
 
         # cache: standardized proxy matrix for all clients (used for norms, etc.)
         self.cached_G = None  # shape [N, d']
+         # FedAvg-style weighted aggregation (default: True for proper FedAvg)
+        self.use_weighted_aggregation = bool(self.config.get("use_weighted_aggregation", True))
 
 
     def run(self, num_rounds: int):
@@ -283,14 +286,20 @@ class FedSTaSCoordinator:
 
             # Step 7: Train selected clients
             models_by_stratum = {}
+            used_counts_by_stratum = {}  # Track actual samples used per client (for FedAvg weighting)
             if self.verbose:
                 print("\\n[Local Training]")
             for h, clients in selected_clients_by_stratum.items():
                 local_models = []
+                local_counts = []  # Sample counts for this stratum
                 for k in clients:
                     #model_copy = self.global_model.to(self.device)
                     model_copy = copy.deepcopy(self.global_model).to(self.device)
-                    
+
+                    # Freeze BatchNorm statistics if enabled (prevents small batch issues)
+                    if self.freeze_bn:
+                        freeze_batchnorm_stats(model_copy)
+                        
                     if use_data_sampling:
                         # FedSTaS: Sample uniformly based on p
                         subset = sample_uniform_data(
@@ -300,11 +309,15 @@ class FedSTaSCoordinator:
                         # FedSTS: Use all client data (no sampling)
                         subset = self.client_datasets[k]
                     
+                    n_used = len(subset)  # Actual number of samples this client will train on
+                    
+                    
                     if self.verbose:
                         method_name = "FedSTaS" if use_data_sampling else "FedSTS"
                         print(f"  Client {k} ({method_name}): training on {len(subset)} samples")
                     
-                    if len(subset) == 0:
+                    #if len(subset) == 0:
+                    if n_used == 0:
                         if self.verbose:
                             print(f"  Client {k}: skipped (0 samples)")
                         continue
@@ -320,14 +333,29 @@ class FedSTaSCoordinator:
                         device=self.device
                     )
                     local_models.append(updated_model)
+                    local_counts.append(n_used)
                 models_by_stratum[h] = local_models
+                used_counts_by_stratum[h] = local_counts
+
 
 
 
 
             # Step 8: Aggregate updates
-            self.global_model = aggregate_models(models_by_stratum, N_h, m_h)
-            print("Aggregated global model updated.")
+            #self.global_model = aggregate_models(models_by_stratum, N_h, m_h)
+            #print("Aggregated global model updated.")
+            if self.use_weighted_aggregation:
+                # FedAvg-style: weight by actual samples used (recommended)
+                self.global_model = aggregate_models_weighted(models_by_stratum, used_counts_by_stratum)
+                total_samples_used = sum(sum(counts) for counts in used_counts_by_stratum.values())
+                if self.verbose:
+                    print(f"Aggregated global model updated (weighted by {total_samples_used} total samples).")
+                else:
+                    print("Aggregated global model updated.")
+            else:
+                # Original stratified aggregation (legacy)
+                self.global_model = aggregate_models(models_by_stratum, N_h, m_h)
+                print("Aggregated global model updated (stratified weighting).")
 
             # Step 9: Evaluate (optional)
             if self.test_dataset is not None:

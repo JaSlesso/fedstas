@@ -1,4 +1,5 @@
 import torch
+import copy
 import torch.nn as nn
 import numpy as np
 from typing import List, Dict
@@ -287,7 +288,8 @@ class FedSTaSCoordinator:
             for h, clients in selected_clients_by_stratum.items():
                 local_models = []
                 for k in clients:
-                    model_copy = self.global_model.to(self.device)
+                    #model_copy = self.global_model.to(self.device)
+                    model_copy = copy.deepcopy(self.global_model).to(self.device)
                     
                     if use_data_sampling:
                         # FedSTaS: Sample uniformly based on p

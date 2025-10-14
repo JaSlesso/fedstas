@@ -14,7 +14,17 @@ def aggregate_models(models_by_stratum: Dict[int, List[torch.nn.Module]], N_h: D
         nn.Module: The aggregated global model
     """
     # Get parameter structure from the first model
-    example_model = next(iter(next(iter(models_by_stratum.values())))) # model from first stratum
+    #example_model = next(iter(next(iter(models_by_stratum.values())))) # model from first stratum
+    # Get parameter structure from the first non-empty stratum
+    example_model = None
+    for stratum_models in models_by_stratum.values():
+        if stratum_models:  # Find first non-empty stratum
+            example_model = stratum_models[0]
+            break
+    
+    if example_model is None:
+        raise ValueError("No models to aggregate - all strata are empty!")
+    
     global_state = {k: torch.zeros_like(v) for k, v in example_model.state_dict().items()}
     total_clients = sum(N_h.values())
 
@@ -28,7 +38,10 @@ def aggregate_models(models_by_stratum: Dict[int, List[torch.nn.Module]], N_h: D
             for k, v in model.state_dict().items():
                 stratum_sum[k] += v
         
-        stratum_avg = {k: v / m_h[h] for k, v in stratum_sum.items()}
+        #stratum_avg = {k: v / m_h[h] for k, v in stratum_sum.items()}
+        # Use actual number of models (some clients may have been skipped due to 0 samples)
+        actual_m_h = len(client_models)
+        stratum_avg = {k: v / actual_m_h for k, v in stratum_sum.items()}
 
         # Weighted by N_h / N
         weight = N_h[h] / total_clients

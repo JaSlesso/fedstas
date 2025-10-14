@@ -296,9 +296,6 @@ class FedSTaSCoordinator:
                     #model_copy = self.global_model.to(self.device)
                     model_copy = copy.deepcopy(self.global_model).to(self.device)
 
-                    # Freeze BatchNorm statistics if enabled (prevents small batch issues)
-                    if self.freeze_bn:
-                        freeze_batchnorm_stats(model_copy)
                         
                     if use_data_sampling:
                         # FedSTaS: Sample uniformly based on p

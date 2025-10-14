@@ -76,6 +76,21 @@ def get_proxy_gradient(
     - Else: returns flattened grad over all parameters.
     """
     n = len(dataset)
+    
+    # Handle empty datasets (can happen with extreme non-IID distributions)
+    if n == 0:
+        # Return a small random gradient for empty clients
+        lin = _find_last_linear(model)
+        if lin is not None and last_layer_only:
+            # Size based on last linear layer
+            size = lin.weight.numel()
+            if lin.bias is not None:
+                size += lin.bias.numel()
+        else:
+            # Small random size
+            size = 100
+        return np.random.randn(size).astype(np.float32) * 1e-6
+    
     take = max(1, min(int(round(n * frac)), cap))
     idx = np.random.choice(np.arange(n), size=take, replace=False)
     subset = Subset(dataset, idx.tolist())

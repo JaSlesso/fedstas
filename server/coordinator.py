@@ -54,6 +54,7 @@ class FedSTaSCoordinator:
         for round_idx in range(num_rounds):
             print(f"\n=== Round {round_idx + 1} ===")
             '''
+'''
             # === Step 1–3: Optional Re-stratification ===
             if round_idx == 0 or round_idx % self.restratify_every == 0:
                 if self.verbose:
@@ -85,6 +86,7 @@ class FedSTaSCoordinator:
                 if self.verbose:
                     print("\n[Stratification] (Using cached strata and allocations)")
             '''
+'''
 
             # === Step 1–3: Optional Re-stratification ===
             if round_idx == 0 or round_idx % self.restratify_every == 0:
@@ -289,8 +291,6 @@ class FedSTaSCoordinator:
 
 
     def run(self, num_rounds: int):
-        
-
         for round_idx in range(num_rounds):
             print(f"\n=== Round {round_idx + 1} ===")
             

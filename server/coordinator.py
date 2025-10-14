@@ -291,10 +291,11 @@ class FedSTaSCoordinator:
                 print("\\n[Local Training]")
             for h, clients in selected_clients_by_stratum.items():
                 local_models = []
-                local_counts = []  # Sample counts for this stratum
+                local_counts = []
                 for k in clients:
                     #model_copy = self.global_model.to(self.device)
                     model_copy = copy.deepcopy(self.global_model).to(self.device)
+                    
 
                         
                     if use_data_sampling:
@@ -343,7 +344,7 @@ class FedSTaSCoordinator:
             #print("Aggregated global model updated.")
             if self.use_weighted_aggregation:
                 # FedAvg-style: weight by actual samples used (recommended)
-                self.global_model = aggregate_models_weighted(models_by_stratum, used_counts_by_stratum)
+                self.global_model = aggregate_models_weighted(models_by_stratum, used_counts_by_stratum, N_h)
                 total_samples_used = sum(sum(counts) for counts in used_counts_by_stratum.values())
                 if self.verbose:
                     print(f"Aggregated global model updated (weighted by {total_samples_used} total samples).")

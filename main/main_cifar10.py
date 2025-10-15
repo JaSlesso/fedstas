@@ -31,6 +31,13 @@ print("Python path:", sys.path[:3])  # Show first 3 entries
 # Now import the modules
 from model.cifar10 import create_model
 from server.coordinator import FedSTaSCoordinator
+import importlib
+import client.trainer
+import server.coordinator
+import model.cifar10
+importlib.reload(client.trainer)
+importlib.reload(server.coordinator)
+importlib.reload(model.cifar10)
 
 
 # ----------------------------

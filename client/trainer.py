@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from torch.nn import Module
-from torch.optim import Adam
+from torch.optim import SGD, Adam, AdamW
 from typing import Dict, Any
 
 from client.sampling import sample_uniform_data
@@ -15,7 +15,10 @@ def local_train(
         sample_fraction: float,
         weight_decay: float = 0.0,
         device: str = "cpu",
-        loss_fn = None
+        loss_fn = None,
+        optimizer_type: str = "sgd",
+        momentum: float = 0.9,
+        use_cosine_decay: bool = True
 ) -> Module:
     """
     Perform local training on a uniformly sampled subset of the dataset.
@@ -27,9 +30,12 @@ def local_train(
         batch_size (int): Batch size for training
         lr (float): Learning rate for optimizer
         sample_fraction (float): Fraction of local data to train on (from server)
-        weight_decay (float): L2 regularization coefficient for Adam optimizer
+        weight_decay (float): L2 regularization coefficient (default: 1e-4)
         device (str): 'cpu' or 'cuda'
         loss_fn (callable, optional): Loss function (defaults to CrossEntropyLoss)
+        optimizer_type (str): Optimizer type: 'sgd', 'adam', or 'adamw' (default: 'sgd')
+        momentum (float): Momentum for SGD optimizer (default: 0.9)
+        use_cosine_decay (bool): Whether to use cosine annealing LR decay (default: True)
 
     Returns:
         Module: Updated local model after training
@@ -41,11 +47,22 @@ def local_train(
     subset = sample_uniform_data(dataset, sample_fraction)
     loader = DataLoader(subset, batch_size=batch_size, shuffle=True)
 
-    # Step 2: Set up optimizer and loss
-    optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    criterion = loss_fn if loss_fn is not None else torch.nn.CrossEntropyLoss()
+    # Step 2: Set up optimizer with momentum and proper weight decay
+    if optimizer_type.lower() == "sgd":
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    elif optimizer_type.lower() == "adamw":
+        optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    else:  # fallback to Adam for backward compatibility
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    
+    # Step 3: Set up cosine annealing LR scheduler to reduce drift
+    scheduler = None
+    if use_cosine_decay:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    
+    criterion = loss_fn if loss_fn is not None else torch.nn.CrossEntropyLoss(label_smoothing=0.05)
 
-    # Step 3: Train
+    # Step 4: Train with LR decay per epoch
     for _ in range(epochs):
         for x, y in loader:
             x, y = x.to(device), y.to(device)
@@ -54,6 +71,10 @@ def local_train(
             loss = criterion(output, y)
             loss.backward()
             optimizer.step()
+        
+        # Step the scheduler after each epoch
+        if scheduler is not None:
+            scheduler.step()
     
     return model
 

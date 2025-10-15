@@ -1,7 +1,7 @@
 import torch
-import copy
 import torch.nn as nn
 import numpy as np
+import copy
 from typing import List, Dict
 from torch.utils.data import DataLoader, Subset
 from client.compression import compress_gradient, decompress_gradient
@@ -13,9 +13,9 @@ from server.stratification import (
     neyman_allocation, importance_sample
 )
 from server.privacy import estimate_total_sample_size
-#from server.aggregation import aggregate_models
 from server.aggregation import aggregate_models, aggregate_models_weighted
 from utils.evals import evaluate_model
+#from utils.batchnorm_utils import freeze_batchnorm_stats
 
 
 # NEW: fast stratification helpers
@@ -69,8 +69,12 @@ class FedSTaSCoordinator:
 
         # cache: standardized proxy matrix for all clients (used for norms, etc.)
         self.cached_G = None  # shape [N, d']
-         # FedAvg-style weighted aggregation (default: True for proper FedAvg)
-        self.use_weighted_aggregation = bool(self.config.get("use_weighted_aggregation", False))
+        
+        # FedAvg-style weighted aggregation (default: True for proper FedAvg)
+        self.use_weighted_aggregation = bool(self.config.get("use_weighted_aggregation", True))
+        
+        # Freeze BatchNorm statistics during local training (default: True for small batches)
+        #self.freeze_bn = bool(self.config.get("freeze_bn", True))
 
 
     def run(self, num_rounds: int):
@@ -162,10 +166,10 @@ class FedSTaSCoordinator:
             N_h = self.cached_N_h
             m_h = self.cached_m_h
             
-            #if self.verbose:
-                #print("\n[Stratification]")
-                #for h, clients in strata.items():
-                    #print(f"  Stratum {h}: N_h = {len(clients)}, S_h = {S_h[h]:.4f}, m_h = {m_h[h]}")
+            if self.verbose:
+                print("\n[Stratification]")
+                for h, clients in strata.items():
+                    print(f"  Stratum {h}: N_h = {len(clients)}, S_h = {S_h[h]:.4f}, m_h = {m_h[h]}")
 
             # Step 4: Sample clients via importance sampling
             selected_clients_by_stratum = {}
@@ -178,8 +182,8 @@ class FedSTaSCoordinator:
                 norms = [np.linalg.norm(self.cached_G[k]) for k in client_indices]
                 selected = importance_sample(client_indices, norms, m_h[h])
                 selected_clients_by_stratum[h] = selected
-                #if self.verbose:
-                    #print(f"  Stratum {h}: selected {selected}")
+                if self.verbose:
+                    print(f"  Stratum {h}: selected {selected}")
             '''
             # Step 5: Collect privatized sample counts
             responses = []
@@ -205,7 +209,7 @@ class FedSTaSCoordinator:
             for h, clients in selected_clients_by_stratum.items():
                 local_models = []
                 for k in clients:
-                    model_copy = self.global_model.to(self.device)
+                    model_copy = copy.deepcopy(self.global_model).to(self.device)
                     subset = sample_uniform_data(
                         self.client_datasets[k], p, seed=round_idx
                     )
@@ -223,8 +227,11 @@ class FedSTaSCoordinator:
                         batch_size=self.config["batch_size"],
                         lr=self.config["lr"],
                         sample_fraction=1.0,
-                        weight_decay=self.config.get("weight_decay", 0.0),
-                        device=self.device
+                        weight_decay=self.config.get("weight_decay", 1e-4),
+                        device=self.device,
+                        optimizer_type=self.config.get("optimizer_type", "sgd"),
+                        momentum=self.config.get("momentum", 0.9),
+                        use_cosine_decay=self.config.get("use_cosine_decay", True)
                     )
                     local_models.append(updated_model)
                 models_by_stratum[h] = local_models
@@ -287,17 +294,14 @@ class FedSTaSCoordinator:
             # Step 7: Train selected clients
             models_by_stratum = {}
             used_counts_by_stratum = {}  # Track actual samples used per client (for FedAvg weighting)
+            
             if self.verbose:
                 print("\\n[Local Training]")
             for h, clients in selected_clients_by_stratum.items():
                 local_models = []
-                local_counts = []
                 for k in clients:
-                    #model_copy = self.global_model.to(self.device)
                     model_copy = copy.deepcopy(self.global_model).to(self.device)
                     
-
-                        
                     if use_data_sampling:
                         # FedSTaS: Sample uniformly based on p
                         subset = sample_uniform_data(
@@ -307,15 +311,11 @@ class FedSTaSCoordinator:
                         # FedSTS: Use all client data (no sampling)
                         subset = self.client_datasets[k]
                     
-                    n_used = len(subset)  # Actual number of samples this client will train on
-                    
-                    
                     if self.verbose:
                         method_name = "FedSTaS" if use_data_sampling else "FedSTS"
                         print(f"  Client {k} ({method_name}): training on {len(subset)} samples")
                     
-                    #if len(subset) == 0:
-                    if n_used == 0:
+                    if len(subset) == 0:
                         if self.verbose:
                             print(f"  Client {k}: skipped (0 samples)")
                         continue
@@ -327,33 +327,21 @@ class FedSTaSCoordinator:
                         batch_size=self.config["batch_size"],
                         lr=self.config["lr"],
                         sample_fraction=1.0,
-                        weight_decay=self.config.get("weight_decay", 0.0),
-                        device=self.device
+                        weight_decay=self.config.get("weight_decay", 1e-4),
+                        device=self.device,
+                        optimizer_type=self.config.get("optimizer_type", "sgd"),
+                        momentum=self.config.get("momentum", 0.9),
+                        use_cosine_decay=self.config.get("use_cosine_decay", True)
                     )
                     local_models.append(updated_model)
-                    local_counts.append(n_used)
                 models_by_stratum[h] = local_models
-                used_counts_by_stratum[h] = local_counts
-
 
 
 
 
             # Step 8: Aggregate updates
-            #self.global_model = aggregate_models(models_by_stratum, N_h, m_h)
-            #print("Aggregated global model updated.")
-            if self.use_weighted_aggregation:
-                # FedAvg-style: weight by actual samples used (recommended)
-                self.global_model = aggregate_models_weighted(models_by_stratum, used_counts_by_stratum, N_h)
-                total_samples_used = sum(sum(counts) for counts in used_counts_by_stratum.values())
-                if self.verbose:
-                    print(f"Aggregated global model updated (weighted by {total_samples_used} total samples).")
-                else:
-                    print("Aggregated global model updated.")
-            else:
-                # Original stratified aggregation (legacy)
-                self.global_model = aggregate_models(models_by_stratum, N_h, m_h)
-                print("Aggregated global model updated (stratified weighting).")
+            self.global_model = aggregate_models(models_by_stratum, N_h, m_h)
+            print("Aggregated global model updated.")
 
             # Step 9: Evaluate (optional)
             if self.test_dataset is not None:

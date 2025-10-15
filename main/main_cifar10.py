@@ -60,6 +60,13 @@ parser.add_argument("--proxy_frac", type=float, default=0.30, help="Fraction of 
 parser.add_argument("--proxy_cap", type=int, default=128, help="Max samples for proxy gradient computation (default: 128)")
 parser.add_argument("--d_prime", type=int, default=5, help="Projection dimension for stratification (default: 5)")
 parser.add_argument("--restratify_every", type=int, default=20, help="Re-stratify every N rounds (default: 20)")
+parser.add_argument("--optimizer_type", type=str, default="sgd", choices=["sgd", "adam", "adamw"],
+                    help="Optimizer type: sgd (default), adam, or adamw")
+parser.add_argument("--momentum", type=float, default=0.9, help="Momentum for SGD optimizer (default: 0.9)")
+parser.add_argument("--use_cosine_decay", action="store_true", default=True, 
+                    help="Use cosine annealing LR decay (default: True)")
+parser.add_argument("--no_cosine_decay", dest="use_cosine_decay", action="store_false",
+                    help="Disable cosine annealing LR decay")
 args = parser.parse_args()
 
 # ----------------------------
@@ -160,6 +167,10 @@ BASE_CFG = dict(
     clustering_method=args.clustering,  # "minibatch" or "gpu"
     proxy_frac=args.proxy_frac,
     proxy_cap=args.proxy_cap,
+    # Gentle LR + decay for stabilizing local steps
+    optimizer_type=args.optimizer_type,  # "sgd", "adam", or "adamw"
+    momentum=args.momentum,  # SGD momentum
+    use_cosine_decay=args.use_cosine_decay,  # Cosine annealing LR decay
 )
 
 def make_coordinator(cfg_overrides=None):

@@ -27,8 +27,8 @@ def aggregate_models(models_by_stratum: Dict[int, List[torch.nn.Module]], N_h: D
         raise ValueError("No models to aggregate - all strata are empty!")
     
     global_state = {k: torch.zeros_like(v) for k, v in example_model.state_dict().items()}
-    total_clients = sum(N_h.values())
-
+    
+   
     for h, client_models in models_by_stratum.items():
         if not client_models or m_h[h] == 0:
             continue
@@ -41,6 +41,11 @@ def aggregate_models(models_by_stratum: Dict[int, List[torch.nn.Module]], N_h: D
         
         #stratum_avg = {k: v / m_h[h] for k, v in stratum_sum.items()}
         # Use actual number of models (some clients may have been skipped due to 0 samples)
+        #total_clients = sum(N_h.values())
+        # normalize by strata that actually contributed models this round
+        total_clients = sum(N_h[h] for h, ms in models_by_stratum.items() if ms) #for non-iid
+        
+
         actual_m_h = len(client_models)
         stratum_avg = {k: v / actual_m_h for k, v in stratum_sum.items()}
 

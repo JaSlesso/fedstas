@@ -2,6 +2,30 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class FastCIFAR10CNN_GN(nn.Module):
+    def __init__(self, num_classes=10, groups=4):
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1)
+        self.gn1   = nn.GroupNorm(groups, 16)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
+        self.gn2   = nn.GroupNorm(groups, 32)
+        self.pool1 = nn.MaxPool2d(2, 2)               # 32 -> 16
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.gn3   = nn.GroupNorm(groups, 64)
+        self.pool2 = nn.MaxPool2d(2, 2)               # 16 -> 8
+        self.fc1   = nn.Linear(64 * 8 * 8, 128)
+        self.fc2   = nn.Linear(128, num_classes)
+
+    def forward(self, x):
+        x = F.relu(self.gn1(self.conv1(x)))
+        x = F.relu(self.gn2(self.conv2(x)))
+        x = self.pool1(x)
+        x = F.relu(self.gn3(self.conv3(x)))
+        x = self.pool2(x)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        return self.fc2(x)
+
 
 class FastCIFAR10CNN(nn.Module):
     """Ultra-fast lightweight CNN model for CIFAR-10 (32x32x3 -> 10 classes)"""

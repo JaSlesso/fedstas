@@ -267,8 +267,8 @@ class FedSTaSCoordinator:
                             M = self.config.get("M", 500)
                             r_k = clip_and_fake(n_k, M, alpha)
                             responses.append(r_k)
-                            if self.verbose:
-                                print(f"  Client {k}: n_k = {n_k}, r_k = {r_k}")
+                            #if self.verbose:
+                                #print(f"  Client {k}: n_k = {n_k}, r_k = {r_k}")
                             idx += 1
                     
                     # Estimate total sample count with privacy
@@ -319,7 +319,7 @@ class FedSTaSCoordinator:
                         if self.verbose:
                             print(f"  Client {k}: skipped (0 samples)")
                         continue
-                    '''
+                    
                     min_threshold = self.config.get("min_samples_threshold", self.config["batch_size"])
                     
                     # Skip ultra-tiny clients before training
@@ -327,7 +327,7 @@ class FedSTaSCoordinator:
                         if self.verbose:
                             print(f"  Client {k}: skipped (too few samples: {len(subset)} < {min_threshold})")
                         continue
-                   '''
+                   
 
                     updated_model = local_train(
                         model=model_copy,
@@ -341,7 +341,7 @@ class FedSTaSCoordinator:
                         optimizer_type=self.config.get("optimizer_type", "sgd"),
                         momentum=self.config.get("momentum", 0.9),
                         use_cosine_decay=self.config.get("use_cosine_decay", True),
-                        #min_samples_threshold=min_threshold
+                        min_samples_threshold=min_threshold
                     )
                     # Check if training was skipped due to tiny client
                    

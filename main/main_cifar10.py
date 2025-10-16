@@ -74,6 +74,8 @@ parser.add_argument("--use_cosine_decay", action="store_true", default=True,
                     help="Use cosine annealing LR decay (default: True)")
 parser.add_argument("--no_cosine_decay", dest="use_cosine_decay", action="store_false",
                     help="Disable cosine annealing LR decay")
+parser.add_argument("--min_samples_threshold", type=int, default=None,
+                    help="Minimum samples for local training; clients with fewer samples are skipped (default: batch_size)")
 args = parser.parse_args()
 
 # ----------------------------
@@ -178,6 +180,8 @@ BASE_CFG = dict(
     optimizer_type=args.optimizer_type,  # "sgd", "adam", or "adamw"
     momentum=args.momentum,  # SGD momentum
     use_cosine_decay=args.use_cosine_decay,  # Cosine annealing LR decay
+    # Tiny client guard (implementation hygiene)
+    min_samples_threshold=args.min_samples_threshold,  # Skip ultra-tiny clients
 )
 
 def make_coordinator(cfg_overrides=None):

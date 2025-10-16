@@ -189,6 +189,8 @@ def create_model(model_type="fast_cnn", num_classes=10):
         return SimpleCIFAR10CNN(num_classes=num_classes)
     elif model_type.lower() == "resnet18":
         return ResNet18CIFAR10(num_classes=num_classes)
+    elif model_type.lower() == "fast_cnn_gn":
+        return FastCIFAR10CNN_GN(num_classes=num_classes)
     else:
         raise ValueError(f"Unknown model_type: {model_type}. Choose 'fast_cnn', 'simple_cnn', or 'resnet18'")
 

@@ -345,12 +345,8 @@ class FedSTaSCoordinator:
                         min_samples_threshold=min_threshold
                     )
                     # Check if training was skipped due to tiny client
-                    if updated_model is model_copy:
-                        if self.verbose:
-                            print(f"  Client {k}: skipped (too few samples: {len(subset)} < {min_threshold or self.config['batch_size']})")
-                    else:
-                        local_models.append(updated_model)
-                    #local_models.append(updated_model)
+                   
+                    local_models.append(updated_model)
                 models_by_stratum[h] = local_models
 
 

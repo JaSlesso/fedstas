@@ -19,6 +19,7 @@ def local_train(
         optimizer_type: str = "sgd",
         momentum: float = 0.9,
         use_cosine_decay: bool = True
+        min_samples_threshold: int = None
 ) -> Module:
     """
     Perform local training on a uniformly sampled subset of the dataset.
@@ -36,6 +37,7 @@ def local_train(
         optimizer_type (str): Optimizer type: 'sgd', 'adam', or 'adamw' (default: 'sgd')
         momentum (float): Momentum for SGD optimizer (default: 0.9)
         use_cosine_decay (bool): Whether to use cosine annealing LR decay (default: True)
+        min_samples_threshold (int): Minimum samples for training; if None, defaults to batch_size
 
     Returns:
         Module: Updated local model after training
@@ -45,7 +47,25 @@ def local_train(
 
     # Step 1: Sample uniformly from the local dataset
     subset = sample_uniform_data(dataset, sample_fraction)
-    loader = DataLoader(subset, batch_size=batch_size, shuffle=True)
+    #loader = DataLoader(subset, batch_size=batch_size, shuffle=True)
+    n_samples = len(subset)
+    
+    # Step 2: Guard against ultra-tiny clients 
+    if min_samples_threshold is None:
+        min_samples_threshold = batch_size  # Default: at least 1 full batch
+    
+    if n_samples < min_samples_threshold:
+        # Ultra-tiny client: return model unchanged (skip local training)
+        # This prevents poisoning from clients with n=3-10 samples
+        return model
+    
+    # Step 3: Adjust batch size for small clients
+    # If n_samples < 2*batch_size, use smaller batches to get at least 2 batches per epoch
+    effective_batch_size = batch_size
+    if n_samples < 2 * batch_size:
+        effective_batch_size = max(1, n_samples // 4)  # At least 4 batches if possible
+    
+    loader = DataLoader(subset, batch_size=effective_batch_size, shuffle=True)
 
     # Step 2: Set up optimizer with momentum and proper weight decay
     if optimizer_type.lower() == "sgd":

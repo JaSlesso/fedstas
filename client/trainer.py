@@ -48,7 +48,7 @@ def local_train(
     # Step 1: Sample uniformly from the local dataset
     subset = sample_uniform_data(dataset, sample_fraction)
     loader = DataLoader(subset, batch_size=batch_size, shuffle=True)
-        '''
+    '''
     n_samples = len(subset)
     
     # Step 2: Guard against ultra-tiny clients 

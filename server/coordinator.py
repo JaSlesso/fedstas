@@ -311,9 +311,9 @@ class FedSTaSCoordinator:
                         # FedSTS: Use all client data (no sampling)
                         subset = self.client_datasets[k]
                     
-                    if self.verbose:
-                        method_name = "FedSTaS" if use_data_sampling else "FedSTS"
-                        print(f"  Client {k} ({method_name}): training on {len(subset)} samples")
+                    #if self.verbose:
+                        #method_name = "FedSTaS" if use_data_sampling else "FedSTS"
+                        #print(f"  Client {k} ({method_name}): training on {len(subset)} samples")
                     
                     if len(subset) == 0:
                         if self.verbose:

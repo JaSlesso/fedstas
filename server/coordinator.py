@@ -320,8 +320,7 @@ class FedSTaSCoordinator:
                             print(f"  Client {k}: skipped (0 samples)")
                         continue
 
-                     # Determine min_samples_threshold for tiny client guard
-                     min_threshold = self.config.get("min_samples_threshold", self.config["batch_size"])
+                    min_threshold = self.config.get("min_samples_threshold", self.config["batch_size"])
                     
                     # Skip ultra-tiny clients before training
                     if len(subset) < min_threshold:

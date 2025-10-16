@@ -18,7 +18,7 @@ def local_train(
         loss_fn = None,
         optimizer_type: str = "sgd",
         momentum: float = 0.9,
-        use_cosine_decay: bool = True
+        use_cosine_decay: bool = True,
         min_samples_threshold: int = None
 ) -> Module:
     """

@@ -320,6 +320,9 @@ class FedSTaSCoordinator:
                             print(f"  Client {k}: skipped (0 samples)")
                         continue
 
+                     # Determine min_samples_threshold for tiny client guard
+                    min_threshold = self.config.get("min_samples_threshold", None)
+
                     updated_model = local_train(
                         model=model_copy,
                         dataset=subset,
@@ -331,9 +334,16 @@ class FedSTaSCoordinator:
                         device=self.device,
                         optimizer_type=self.config.get("optimizer_type", "sgd"),
                         momentum=self.config.get("momentum", 0.9),
-                        use_cosine_decay=self.config.get("use_cosine_decay", True)
+                        use_cosine_decay=self.config.get("use_cosine_decay", True),
+                        min_samples_threshold=min_threshold
                     )
-                    local_models.append(updated_model)
+                    # Check if training was skipped due to tiny client
+                    if updated_model is model_copy:
+                        if self.verbose:
+                            print(f"  Client {k}: skipped (too few samples: {len(subset)} < {min_threshold or self.config['batch_size']})")
+                    else:
+                        local_models.append(updated_model)
+                    #local_models.append(updated_model)
                 models_by_stratum[h] = local_models
 
 

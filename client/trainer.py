@@ -19,7 +19,7 @@ def local_train(
         optimizer_type: str = "sgd",
         momentum: float = 0.9,
         use_cosine_decay: bool = True,
-        #min_samples_threshold: int = None
+        min_samples_threshold: int = None
 ) -> Module:
     """
     Perform local training on a uniformly sampled subset of the dataset.
@@ -47,8 +47,8 @@ def local_train(
 
     # Step 1: Sample uniformly from the local dataset
     subset = sample_uniform_data(dataset, sample_fraction)
-    loader = DataLoader(subset, batch_size=batch_size, shuffle=True)
-    '''
+    #loader = DataLoader(subset, batch_size=batch_size, shuffle=True)
+    
     n_samples = len(subset)
     
     # Step 2: Guard against ultra-tiny clients 
@@ -67,7 +67,7 @@ def local_train(
         effective_batch_size = max(1, n_samples // 4)  # At least 4 batches if possible
     
     loader = DataLoader(subset, batch_size=effective_batch_size, shuffle=True)
-    '''
+    
 
     # Step 2: Set up optimizer with momentum and proper weight decay
     if optimizer_type.lower() == "sgd":

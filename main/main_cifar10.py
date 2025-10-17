@@ -208,7 +208,10 @@ def run_once(label, cfg_overrides=None, num_rounds=args.rounds):
     print(f"\n=== Running: {label} ===")
     coord = make_coordinator(cfg_overrides)
     coord.run(num_rounds=num_rounds)
-    return np.array(coord.validation_curve, dtype=float), np.array(coord.validation_loss_curve, dtype=float)
+    #return np.array(coord.validation_curve, dtype=float), np.array(coord.validation_loss_curve, dtype=float)
+    return (np.array(coord.validation_curve, dtype=float), 
+            np.array(coord.validation_loss_curve, dtype=float),
+            np.array(coord.validation_macro_f1_curve, dtype=float))
 
 # ----------------------------
 # 4) Define the runs based on --method argument
@@ -237,10 +240,12 @@ else:
 # ----------------------------
 results_acc = {}
 results_loss = {}
+results_macro_f1 = {}
 for label, over in runs:
-    acc_curve, loss_curve = run_once(label, over, num_rounds=args.rounds)
+    acc_curve, loss_curve, macro_f1_curve = run_once(label, over, num_rounds=args.rounds)
     results_acc[label] = acc_curve
     results_loss[label] = loss_curve
+    results_macro_f1[label] = macro_f1_curve
 
 # ----------------------------
 # 6) Save CSV
@@ -250,6 +255,7 @@ rows = []
 for label in results_acc.keys():
     acc_curve = results_acc[label]
     loss_curve = results_loss[label]
+    macro_f1_curve = results_macro_f1[label]
     
     # Determine method name for CSV
     if "FedSTS" in label and "FedSTaS" not in label:
@@ -265,12 +271,13 @@ for label in results_acc.keys():
         actual_n_star = args.n_star
         actual_epsilon = args.epsilon
     
-    for r, (acc, loss) in enumerate(zip(acc_curve, loss_curve), start=1):
+    for r, (acc, loss, macro_f1) in enumerate(zip(acc_curve, loss_curve, macro_f1_curve), start=1):
         rows.append({
             "method": method_name,
             "round": r,
             "test_accuracy": float(acc),
             "test_loss": float(loss),
+            "macro_f1": float(macro_f1),
             "beta": args.beta if not args.iid else None,
             "data_distribution": "IID" if args.iid else f"Dirichlet(β={args.beta})",
             "epsilon": actual_epsilon,

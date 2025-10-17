@@ -63,8 +63,8 @@ parser.add_argument("--method", type=str, default="all", choices=["all", "fedsts
                     help="Which method to run: all (default), fedsts, fedstas_no_dp, or fedstas_dp")
 parser.add_argument("--clustering", type=str, default="gpu", choices=["minibatch", "gpu"],
                     help="Clustering method: minibatch (CPU, default) or gpu (cuML)")
-parser.add_argument("--proxy_frac", type=float, default=0.50, help="Fraction of client data for proxy gradient (default: 0.30 = 30%%)")
-parser.add_argument("--proxy_cap", type=int, default=1024, help="Max samples for proxy gradient computation (default: 128)")
+parser.add_argument("--proxy_frac", type=float, default=0.30, help="Fraction of client data for proxy gradient (default: 0.30 = 30%%)")
+parser.add_argument("--proxy_cap", type=int, default=512, help="Max samples for proxy gradient computation (default: 128)")
 parser.add_argument("--d_prime", type=int, default=50, help="Projection dimension for stratification (default: 5)")
 parser.add_argument("--restratify_every", type=int, default=20, help="Re-stratify every N rounds (default: 20)")
 parser.add_argument("--optimizer_type", type=str, default="sgd", choices=["sgd", "adam", "adamw"],

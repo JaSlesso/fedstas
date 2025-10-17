@@ -295,9 +295,21 @@ for label in results_acc.keys():
         })
 
 df = pd.DataFrame(rows)
-df.to_csv(args.csv, index=False)
-print(f"\nSaved results to: {os.path.abspath(args.csv)}")
-print(f"Total rows: {len(df)}")
+#df.to_csv(args.csv, index=False)
+#print(f"\nSaved results to: {os.path.abspath(args.csv)}")
+#print(f"Total rows: {len(df)}")
+if os.path.exists(args.csv):
+    # Read existing CSV and append new rows
+    df_existing = pd.read_csv(args.csv)
+    df_combined = pd.concat([df_existing, df], ignore_index=True)
+    df_combined.to_csv(args.csv, index=False)
+    print(f"\n✅ Appended {len(df)} rows to existing CSV: {os.path.abspath(args.csv)}")
+    print(f"Total rows in CSV: {len(df_combined)}")
+else:
+    # Create new CSV
+    df.to_csv(args.csv, index=False)
+    print(f"\n✅ Created new CSV: {os.path.abspath(args.csv)}")
+    print(f"Total rows: {len(df)}")
 print(f"Methods: {df['method'].unique().tolist()}")
 print(f"Rounds: {df['round'].min()} to {df['round'].max()}")
 

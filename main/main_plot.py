@@ -90,7 +90,7 @@ def plot_comparison(results, output_file, skip_points=1):
     
     plt.title('Test Accuracy', fontsize=14, fontweight='bold')
     plt.xlabel('Round', fontsize=12)
-    plt.ylabel('Accuracy (%)', fontsize=12)
+    plt.ylabel('Accuracy', fontsize=12)
     plt.grid(True, alpha=0.3)
     plt.legend(loc='lower right', fontsize=10)
     

@@ -64,8 +64,8 @@ def get_proxy_gradient(
     dataset,
     device: str = "cpu",
     *,
-    frac: float = 0.30,       # use ~30% of that client's data
-    cap: int = 128,            # cap at 64 examples
+    frac: float = 0.50,       # use ~30% of that client's data
+    cap: int = 1024,            # cap at 64 examples
     last_layer_only: bool = True,   # use final layer grad (small, stable)
     criterion: Optional[nn.Module] = None,
     autocast_dtype: Optional[torch.dtype] = None,  # e.g., torch.float16 on T4
@@ -129,8 +129,8 @@ def build_client_proxies(
     client_datasets: List,
     *,
     device: str = "cpu",
-    frac: float = 0.30,
-    cap: int = 128,
+    frac: float = 0.50,
+    cap: int = 1024,
     last_layer_only: bool = True,
     proj_dim: Optional[int] = None,
     proj_seed: int = 0,

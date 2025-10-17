@@ -44,6 +44,7 @@ class FedSTaSCoordinator:
         self.test_dataset = test_dataset
         self.validation_curve = []
         self.validation_loss_curve = []
+        self.validation_macro_f1_curve = []
         self.device = device
         self.config = config
         self.num_clients = len(client_datasets)
@@ -357,7 +358,8 @@ class FedSTaSCoordinator:
 
             # Step 9: Evaluate (optional)
             if self.test_dataset is not None:
-                acc, val_loss = evaluate_model(self.global_model, self.test_dataset, device=self.device)
-                print(f"Validation accuracy: {acc*100:.3f}% | Loss: {val_loss:.4f}")
+                acc, val_loss, macro_f1 = evaluate_model(self.global_model, self.test_dataset, device=self.device, num_classes=10)
+                print(f"Validation accuracy: {acc*100:.3f}% | Loss: {val_loss:.4f} | Macro-F1: {macro_f1*100:.3f}%")
                 self.validation_curve.append(acc)
                 self.validation_loss_curve.append(val_loss)
+                self.validation_macro_f1_curve.append(macro_f1)

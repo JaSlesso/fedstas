@@ -144,7 +144,7 @@ class FedSTaSCoordinator:
                 strata_local = stratify_clients(
                     G_std, H=self.config["H"], 
                     method=self.clustering_method,
-                    batch_size=128, max_iter=50, seed=42, n_init=10
+                    batch_size=128, max_iter=50, seed=562, n_init=10
                 )
                 # map local indices (0..N-1) back to global client ids
                 self.cached_strata = {h: [all_client_indices[i] for i in idxs]

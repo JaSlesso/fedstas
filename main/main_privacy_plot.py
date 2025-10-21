@@ -105,8 +105,8 @@ def plot_privacy_utility_tradeoff(
         10: '#d62728',      # Red
         100: '#1f77b4',     # Blue
         500: '#ff7f0e',     # Orange (added)
-        1000: '#ff7f0e',    # Orange
-        2000: '#2ca02c',    # Green (added)
+        1000: '#2ca02c',    # Green
+        2000: '#ff7f0e',    # Orange
         5000: '#9467bd',    # Purple (added)
         10000: '#9467bd',   # Purple
     }
@@ -115,8 +115,8 @@ def plot_privacy_utility_tradeoff(
         10: 's',      # Square
         100: 's',     # Square
         500: 'o',     # Circle
-        1000: 'o',    # Circle
-        2000: 'D',    # Diamond
+        1000: 'D',    # Circle
+        2000: 'o',    # Diamond
         5000: 'D',    # Diamond
         10000: 'D',   # Diamond
     }
@@ -136,7 +136,7 @@ def plot_privacy_utility_tradeoff(
         data = results_df[results_df['M'] == M].sort_values('epsilon', ascending=False)
         
         # Format M value for legend (use scientific notation for large M)
-        if M >= 1000:
+        if M >= 10000:
             M_label = f"$M = 10^{int(np.log10(M))}$" if M in [10, 100, 1000, 10000] else f"$M = {M}$"
         else:
             M_label = f"$M = {M}$"
@@ -298,7 +298,7 @@ if __name__ == "__main__":
     parser.add_argument("csv", type=str, help="Path to CSV file with results")
     parser.add_argument("--output", type=str, default="privacy_utility_tradeoff.png", 
                         help="Output plot filename")
-    parser.add_argument("--title", type=str, default="Privacy-Utility Tradeoff (β=0.5)",
+    parser.add_argument("--title", type=str, default="Privacy-Utility Tradeoff",
                         help="Plot title")
     parser.add_argument("--centralization", type=float, default=None,
                         help="Centralized training Macro-F1 baseline")

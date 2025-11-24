@@ -45,6 +45,7 @@ class FedSTaSCoordinator:
         self.validation_curve = []
         self.validation_loss_curve = []
         self.validation_macro_f1_curve = []
+        self.training_samples_per_round = []
         self.device = device
         self.config = config
         self.num_clients = len(client_datasets)
@@ -295,6 +296,7 @@ class FedSTaSCoordinator:
             # Step 7: Train selected clients
             models_by_stratum = {}
             used_counts_by_stratum = {}  # Track actual samples used per client (for FedAvg weighting)
+            total_samples_this_round = 0  # Track total training samples used this round
             
             if self.verbose:
                 print("\\n[Local Training]")
@@ -328,7 +330,8 @@ class FedSTaSCoordinator:
                         if self.verbose:
                             print(f"  Client {k}: skipped (too few samples: {len(subset)} < {min_threshold})")
                         continue
-                   
+                    # Track samples used for this client
+                    total_samples_this_round += len(subset)
 
                     updated_model = local_train(
                         model=model_copy,
@@ -351,7 +354,8 @@ class FedSTaSCoordinator:
 
 
 
-
+            # Record total training samples used this round
+            self.training_samples_per_round.append(total_samples_this_round)
             # Step 8: Aggregate updates
             self.global_model = aggregate_models(models_by_stratum, N_h, m_h)
             print("Aggregated global model updated.")

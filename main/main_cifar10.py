@@ -211,7 +211,8 @@ def run_once(label, cfg_overrides=None, num_rounds=args.rounds):
     #return np.array(coord.validation_curve, dtype=float), np.array(coord.validation_loss_curve, dtype=float)
     return (np.array(coord.validation_curve, dtype=float), 
             np.array(coord.validation_loss_curve, dtype=float),
-            np.array(coord.validation_macro_f1_curve, dtype=float))
+            np.array(coord.validation_macro_f1_curve, dtype=float)),
+            np.array(coord.training_samples_per_round, dtype=int))
 
 # ----------------------------
 # 4) Define the runs based on --method argument
@@ -241,11 +242,13 @@ else:
 results_acc = {}
 results_loss = {}
 results_macro_f1 = {}
+results_samples = {}
 for label, over in runs:
-    acc_curve, loss_curve, macro_f1_curve = run_once(label, over, num_rounds=args.rounds)
+    acc_curve, loss_curve, macro_f1_curve, samples_curve = run_once(label, over, num_rounds=args.rounds)
     results_acc[label] = acc_curve
     results_loss[label] = loss_curve
     results_macro_f1[label] = macro_f1_curve
+    results_samples[label] = samples_curve
 
 # ----------------------------
 # 6) Save CSV
@@ -256,6 +259,7 @@ for label in results_acc.keys():
     acc_curve = results_acc[label]
     loss_curve = results_loss[label]
     macro_f1_curve = results_macro_f1[label]
+    samples_curve = results_samples[label]
     
     # Determine method name for CSV
     if "FedSTS" in label and "FedSTaS" not in label:
@@ -270,14 +274,20 @@ for label in results_acc.keys():
         method_name = "FedSTaS_DP"
         actual_n_star = args.n_star
         actual_epsilon = args.epsilon
+        
+    # Calculate accumulated training samples
+    accumulated_samples = 0
     
-    for r, (acc, loss, macro_f1) in enumerate(zip(acc_curve, loss_curve, macro_f1_curve), start=1):
+    for r, (acc, loss, macro_f1, samples) in enumerate(zip(acc_curve, loss_curve, macro_f1_curve, samples_curve), start=1):
+        accumulated_samples += int(samples)
         rows.append({
             "method": method_name,
             "round": r,
             "test_accuracy": float(acc),
             "test_loss": float(loss),
             "macro_f1": float(macro_f1),
+            "training_samples_this_round": int(samples),
+            "accumulated_training_samples": accumulated_samples,
             "beta": args.beta if not args.iid else None,
             "data_distribution": "IID" if args.iid else f"Dirichlet(β={args.beta})",
             "epsilon": actual_epsilon,

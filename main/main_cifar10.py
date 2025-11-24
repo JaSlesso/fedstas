@@ -211,7 +211,7 @@ def run_once(label, cfg_overrides=None, num_rounds=args.rounds):
     #return np.array(coord.validation_curve, dtype=float), np.array(coord.validation_loss_curve, dtype=float)
     return (np.array(coord.validation_curve, dtype=float), 
             np.array(coord.validation_loss_curve, dtype=float),
-            np.array(coord.validation_macro_f1_curve, dtype=float)),
+            np.array(coord.validation_macro_f1_curve, dtype=float),
             np.array(coord.training_samples_per_round, dtype=int))
 
 # ----------------------------

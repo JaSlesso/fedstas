@@ -62,7 +62,8 @@ def load_results_from_csv(csv_file):
 
 def plot_accumulated_samples_comparison(results, output_file, skip_points=1):
     """
-    Plot comparison of accumulated samples vs test accuracy and macro F1.
+    Plot comparison of test accuracy vs accumulated samples and macro F1 vs accumulated samples.
+    X-axis: Accuracy/Macro F1, Y-axis: Accumulated Samples
     Matches the exact style of main_plot.py
     """
     if not results:
@@ -71,36 +72,45 @@ def plot_accumulated_samples_comparison(results, output_file, skip_points=1):
     
     plt.figure(figsize=(15, 5))
     
-    # Plot 1: Accumulated Samples vs Test Accuracy
+    # Plot 1: Test Accuracy vs Accumulated Samples (axes swapped)
     plt.subplot(1, 2, 1)
     for method, data in results.items():
         if 'test_acc' in data and len(data['test_acc']) > 0:
             accumulated_samples = data.get('accumulated_samples', [])
-            x_values = accumulated_samples[::skip_points]
-            y_values = data['test_acc'][::skip_points]
+            x_values = data['test_acc'][::skip_points]  # Accuracy on x-axis
+            y_values = accumulated_samples[::skip_points]  # Samples on y-axis
             plt.plot(x_values, y_values, '-', linewidth=2, label=method, marker='o', markersize=4)
     
-    plt.title('Test Accuracy', fontsize=14, fontweight='bold')
-    plt.xlabel('Accumulated Training Samples', fontsize=12)
-    plt.ylabel('Accuracy', fontsize=12)
+    plt.title('Accumulated Data vs Accuracy', fontsize=14, fontweight='bold')
+    plt.xlabel('Accuracy (%)', fontsize=12)
+    plt.ylabel('Accumulated Training Samples (1e6)', fontsize=12)
+    plt.xlim(0, 0.45)  # Cap x-axis at 0.45
     plt.grid(True, alpha=0.3)
-    plt.legend(loc='lower right', fontsize=10)
+    plt.legend(loc='upper left', fontsize=10)
     
-    # Plot 2: Accumulated Samples vs Macro F1
+    # Format y-axis with M (millions) unit
+    ax1 = plt.gca()
+    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, p: f'{y/1e6:.1f}1e6'))
+    
+    # Plot 2: Macro F1 vs Accumulated Samples (axes swapped)
     plt.subplot(1, 2, 2)
     for method, data in results.items():
         if 'macro_f1' in data and data['macro_f1'] is not None and len(data['macro_f1']) > 0:
             accumulated_samples = data.get('accumulated_samples', [])
-            x_values = accumulated_samples[::skip_points]
-            y_values = data['macro_f1'][::skip_points]
+            x_values = data['macro_f1'][::skip_points]  # Macro F1 on x-axis
+            y_values = accumulated_samples[::skip_points]  # Samples on y-axis
             plt.plot(x_values, y_values, '-', linewidth=2, label=method, marker='o', markersize=4)
     
-    plt.title('Macro F1', fontsize=14, fontweight='bold')
-    plt.xlabel('Accumulated Training Samples', fontsize=12)
-    plt.ylabel('Macro F1', fontsize=12)
-    plt.ylim(0, 0.45)  # Cap y-axis at 0.45
+    plt.title('Accumulated Data vs Macro F1', fontsize=14, fontweight='bold')
+    plt.xlabel('Macro F1', fontsize=12)
+    plt.ylabel('Accumulated Training Samples (1e6)', fontsize=12)
+    plt.xlim(0, 0.45)  # Cap x-axis at 0.45
     plt.grid(True, alpha=0.3)
-    plt.legend(loc='lower right', fontsize=10)
+    plt.legend(loc='upper left', fontsize=10)
+    
+    # Format y-axis with M (millions) unit
+    ax2 = plt.gca()
+    ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, p: f'{y/1e6:.1f}1e6'))
     
     plt.tight_layout()
     
